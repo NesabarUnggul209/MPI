@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peta Peduli Lingkungan Baregbeg - SMP Kelas 9</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        #map { height: calc(100vh - 5rem); width: 100%; z-index: 10; }
+        @media (max-width: 768px) {
+            #map { height: 50vh; }
+        }
+    </style>
+</head>
+<body class="bg-emerald-50 text-slate-800 flex flex-col h-screen overflow-hidden">
+
+    <header class="bg-emerald-600 text-white shadow-md z-20 flex items-center justify-between px-4 py-3 h-20">
+        <div class="flex items-center space-x-3">
+            <div class="bg-white text-emerald-600 p-2 rounded-xl shadow-inner font-bold text-xl flex items-center justify-center w-10 h-10">
+                🌱
+            </div>
+            <div>
+                <h1 class="text-lg md:text-xl font-bold tracking-tight">Peta Peduli Lingkungan Baregbeg</h1>
+                <p class="text-xs text-emerald-100">Tugas Akhir Teks Deskripsi Kelas IX SMPN 1 Baregbeg</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <!-- Tombol Lapor Siswa -->
+            <button onclick="openModal()" class="bg-amber-400 hover:bg-amber-500 text-slate-900 font-semibold px-4 py-2 rounded-xl shadow transition transform active:scale-95 flex items-center space-x-2 text-sm md:text-base">
+                <span>➕</span>
+                <span class="hidden sm:inline">Lapor Lingkungan</span>
+            </button>
+            <!-- Tombol Login / Status Admin Guru -->
+            <div id="authContainer">
+                <button onclick="openLoginModal()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-3 py-2 rounded-xl shadow transition text-sm flex items-center space-x-1">
+                    <span>🔑</span>
+                    <span class="hidden sm:inline">Login Guru</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+        <!-- Sidebar Daftar Laporan -->
+        <aside class="w-full md:w-96 bg-white border-r border-emerald-100 flex flex-col z-20 shadow-lg order-2 md:order-1 h-1/2 md:h-full">
+            <div class="p-4 bg-emerald-50 border-b border-emerald-100 flex justify-between items-center">
+                <h2 class="font-bold text-emerald-800 flex items-center gap-2">
+                    <span>📋</span> Daftar Laporan Terbaru
+                </h2>
+                <span id="reportCount" class="bg-emerald-600 text-white text-xs px-2.5 py-1 rounded-full font-semibold">0 Laporan</span>
+            </div>
+            <div id="reportList" class="flex-1 overflow-y-auto p-4 space-y-4 divide-y divide-emerald-50">
+                <div class="text-center py-8 text-slate-400 text-sm">
+                    Belum ada laporan lingkungan.<br>Yuk laporkan kondisi di sekitar dusunmu!
+                </div>
+            </div>
+        </aside>
+
+        <!-- Peta Utama -->
+        <section class="flex-1 relative order-1 md:order-2 h-1/2 md:h-full">
+            <div id="map"></div>
+            <div class="absolute bottom-4 right-4 z-[999] bg-white/90 backdrop-blur p-2 rounded-xl shadow-md text-xs text-slate-600 border border-emerald-200 hidden md:block">
+                📍 Gunakan tombol "Lapor Lingkungan" di atas untuk menambahkan titik laporan masalah sampah.
+            </div>
+        </section>
+    </main>
+
+    <div id="reportModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-emerald-100 my-8">
+            <div class="bg-emerald-600 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="font-bold text-lg flex items-center gap-2">
+                    <span>📝</span> Formulir Lapor Kebersihan Lingkungan
+                </h3>
+                <button onclick="closeModal()" class="text-white/80 hover:text-white font-bold text-xl">&times;</button>
+            </div>
+            
+            <form id="envForm" onsubmit="handleFormSubmit(event)" class="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Nama Siswa</label>
+                        <input type="text" id="studentName" required placeholder="Contoh: Rian" class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Pilih Kelas</label>
+                        <select id="studentClass" required class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm bg-white">
+                            <option value="" disabled selected>-- Pilih Kelas 9 --</option>
+                            <option value="Kelas 9A">Kelas 9A</option>
+                            <option value="Kelas 9B">Kelas 9B</option>
+                            <option value="Kelas 9C">Kelas 9C</option>
+                            <option value="Kelas 9D">Kelas 9D</option>
+                            <option value="Kelas 9E">Kelas 9E</option>
+                            <option value="Kelas 9F">Kelas 9F</option>
+                            <option value="Kelas 9G">Kelas 9G</option>
+                            <option value="Kelas 9H">Kelas 9H</option>
+                            <option value="Kelas 9I">Kelas 9I</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Dusun / Lokasi di Baregbeg</label>
+                    <input type="text" id="locationTitle" required placeholder="Contoh: Dusun Baregbeg Girang" class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Koordinat Lokasi (Latitude, Longitude)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="coordDisplay" readonly required placeholder="Klik 'Lokasi Saya' atau pilih di peta" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono text-slate-600">
+                        <button type="button" onclick="getCurrentLocation()" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-semibold px-3 py-2 rounded-xl transition whitespace-nowrap">
+                            📍 Lokasi Saya
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">Anda juga dapat mengklik langsung pada peta saat formulir ini terbuka untuk memilih titik lokasi.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Unggah Foto Kondisi Lingkungan</label>
+                    <input type="file" id="envPhoto" accept="image/*" required onchange="previewImage(event)" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer border border-slate-300 rounded-xl">
+                    <div id="imagePreviewContainer" class="mt-2 hidden">
+                        <img id="imgPreview" src="" alt="Pratinjau Foto" class="h-32 w-full object-cover rounded-xl border border-slate-200">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Deskripsi Masalah (Min. 3-4 kalimat/paragraf)</label>
+                    <textarea id="envDescription" rows="4" required placeholder="Tuliskan cerita atau kondisi tumpukan sampah di tempat ini, dampaknya bagi warga sekitar, serta harapan atau ajakan kamu untuk menjaga kebersihan..." class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm"></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-semibold transition">Batal</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow transition">Kirim Laporan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="loginModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-emerald-100">
+            <div class="bg-emerald-700 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <span>🔐</span> Login Akun Guru / Admin
+                </h3>
+                <button onclick="closeLoginModal()" class="text-white/80 hover:text-white font-bold text-xl">&times;</button>
+            </div>
+            
+            <form onsubmit="handleLogin(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Username</label>
+                    <input type="text" id="adminUser" required placeholder="Masukkan username" class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Password</label>
+                    <input type="password" id="adminPass" required placeholder="Masukkan password" class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none text-sm">
+                </div>
+                <div id="loginError" class="text-red-500 text-xs hidden font-medium">Username atau password salah!</div>
+
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeLoginModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-semibold transition">Batal</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-sm font-semibold shadow transition">Masuk</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="lightboxModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[1000] hidden flex items-center justify-center p-4" onclick="closeLightbox()">
+        <div class="relative max-w-4xl w-full flex flex-col items-center">
+            <button onclick="closeLightbox()" class="absolute -top-10 right-0 text-white text-3xl font-bold">&times;</button>
+            <img id="lightboxImg" src="" alt="Foto Diperbesar" class="max-h-[80vh] max-w-full rounded-2xl shadow-2xl object-contain bg-black">
+            <p id="lightboxCaption" class="text-white text-sm mt-3 text-center font-medium"></p>
+        </div>
+    </div>
+
+    <script>
+        const BAREGBEG_LAT = -7.3155;
+        const BAREGBEG_LNG = 108.3842;
+
+        let map;
+        let markersGroup;
+        let selectedLat = BAREGBEG_LAT;
+        let selectedLng = BAREGBEG_LNG;
+        let tempMarker = null;
+        let isAdminLoggedIn = localStorage.getItem('baregbeg_admin_logged') === 'true';
+
+        let reports = JSON.parse(localStorage.getItem('baregbeg_env_reports')) || [
+            {
+                id: 1,
+                name: "Siti Aminah",
+                studentClass: "Kelas 9B",
+                location: "Dusun Baregbeg Kolot",
+                lat: -7.3180,
+                lng: 108.3800,
+                photo: "https://placehold.co/600x400/10b981/ffffff?text=Tumpukan+Sampah+Saluran+Air",
+                description: "Di sekitar saluran air Dusun Baregbeg Kolot terdapat banyak tumpukan sampah plastik kresek dan botol minuman bekas yang dibuang sembarangan oleh orang yang tidak bertanggung jawab. Kondisi ini sangat memprihatinkan karena selain merusak pemandangan, aliran air menjadi tersumbat dan berpotensi menimbulkan bau tidak sedap serta sarang nyamuk.\n\nSebagai siswa kelas 9 SMP, saya merasa prihatin melihat lingkungan sekitar kita tercemar limbah rumah tangga. Padahal gotong royong membersihkan lingkungan rutin dicanangkan, namun kesadaran individu masih kurang.\n\nHarapan saya melalui laporan di peta ini, perangkat desa setempat dan teman-teman sekolah tergerak untuk membersihkan saluran air ini bersama-sama demi kesehatan warga Baregbeg.",
+                date: "26 September 2026"
+            },
+            {
+                id: 2,
+                name: "Rizki Maulana",
+                studentClass: "Kelas 9C",
+                location: "Dekat Lapangan Sepak Bola Baregbeg",
+                lat: -7.3120,
+                lng: 108.3890,
+                photo: "https://placehold.co/600x400/059669/ffffff?text=Sampah+Plastik+Pojok+Lapangan",
+                description: "Selepas kegiatan olahraga hari Minggu kemarin, pojok utara lapangan sepak bola Baregbeg tampak dipenuhi oleh sampah bungkus jajanan anak-anak dan gelas plastik minuman ringan yang berserakan di rumput.\n\nSangat disayangkan fasilitas umum yang biasa kita gunakan untuk berolahraga dan bermain justru dikotori oleh sampah plastik yang sulit terurai. Hewan ternak warga yang lewat juga dikhawatirkan memakan sampah plastik tersebut.\n\nMari kita jaga kebersihan fasilitas umum di Kecamatan Baregbeg ini dengan selalu membawa kantong sampah sendiri atau membuang sampah pada tempat yang telah disediakan.",
+                date: "25 September 2026"
+            }
+        ];
+
+        function initMap() {
+            map = L.map('map').setView([BAREGBEG_LAT, BAREGBEG_LNG], 14);
+
+            // Menggunakan Esri World Street Map yang stabil, cepat, dan bebas blokir
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+            }).addTo(map);
+
+            markersGroup = L.layerGroup().addTo(map);
+
+            // Klik peta HANYA untuk mengubah titik koordinat pin apabila modal form laporan sedang terbuka
+            map.on('click', function(e) {
+                const modal = document.getElementById('reportModal');
+                if (modal.classList.contains('hidden')) {
+                    return; // Jika form tertutup, klik peta diabaikan sepenuhnya agar tidak mengganggu navigasi
+                }
+
+                selectedLat = e.latlng.lat;
+                selectedLng = e.latlng.lng;
+                
+                const coordInput = document.getElementById('coordDisplay');
+                if (coordInput) {
+                    coordInput.value = `${selectedLat.toFixed(5)}, ${selectedLng.toFixed(5)}`;
+                }
+                
+                if (tempMarker) {
+                    map.removeLayer(tempMarker);
+                }
+                tempMarker = L.marker([selectedLat, selectedLng], {
+                    icon: L.divIcon({
+                        className: 'custom-temp-marker',
+                        html: '<div style="background-color: #f59e0b; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"></div>',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    })
+                }).addTo(map);
+            });
+
+            updateAuthUI();
+            renderReports();
+        }
+
+        function updateAuthUI() {
+            const authContainer = document.getElementById('authContainer');
+            if (isAdminLoggedIn) {
+                authContainer.innerHTML = `
+                    <div class="flex items-center space-x-2 bg-emerald-700/80 px-3 py-1.5 rounded-xl border border-emerald-500">
+                        <span class="text-xs text-white font-medium">👨‍🏫 Admin Guru</span>
+                        <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-lg text-xs font-semibold transition">Keluar</button>
+                    </div>
+                `;
+            } else {
+                authContainer.innerHTML = `
+                    <button onclick="openLoginModal()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-3 py-2 rounded-xl shadow transition text-sm flex items-center space-x-1">
+                        <span>🔑</span>
+                        <span class="hidden sm:inline">Login Guru</span>
+                    </button>
+                `;
+            }
+        }
+
+        function openLoginModal() {
+            document.getElementById('loginModal').classList.remove('hidden');
+            document.getElementById('adminUser').value = '';
+            document.getElementById('adminPass').value = '';
+            document.getElementById('loginError').classList.add('hidden');
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.add('hidden');
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            const u = document.getElementById('adminUser').value.trim();
+            const p = document.getElementById('adminPass').value.trim();
+
+            if (u === 'admin1' && p === '123456') {
+                isAdminLoggedIn = true;
+                localStorage.setItem('baregbeg_admin_logged', 'true');
+                closeLoginModal();
+                updateAuthUI();
+                renderReports();
+                showCustomMessage('Berhasil masuk sebagai Admin Guru! Anda sekarang dapat menghapus laporan.');
+            } else {
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        }
+
+        function handleLogout() {
+            isAdminLoggedIn = false;
+            localStorage.setItem('baregbeg_admin_logged', 'false');
+            updateAuthUI();
+            renderReports();
+            showCustomMessage('Anda telah keluar dari akun Admin Guru.');
+        }
+
+        function deleteReport(id) {
+            if (!isAdminLoggedIn) {
+                showCustomMessage('Akses ditolak. Hanya guru yang dapat menghapus laporan.');
+                return;
+            }
+            if (confirm('Yakin ingin menghapus laporan lingkungan ini?')) {
+                reports = reports.filter(r => r.id !== id);
+                localStorage.setItem('baregbeg_env_reports', JSON.stringify(reports));
+                renderReports();
+                showCustomMessage('Laporan berhasil dihapus oleh guru.');
+            }
+        }
+
+        function renderReports() {
+            markersGroup.clearLayers();
+            const listContainer = document.getElementById('reportList');
+            listContainer.innerHTML = '';
+
+            document.getElementById('reportCount').innerText = `${reports.length} Laporan`;
+
+            if (reports.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-8 text-slate-400 text-sm">
+                        Belum ada laporan lingkungan.<br>Yuk laporkan kondisi di sekitar dusunmu!
+                    </div>
+                `;
+                return;
+            }
+
+            reports.forEach((rep) => {
+                const marker = L.marker([rep.lat, rep.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-report-marker',
+                        html: '<div style="background-color: #059669; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3); font-size: 14px;">🗑️</div>',
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    })
+                });
+
+                let deleteBtnPopup = '';
+                if (isAdminLoggedIn) {
+                    deleteBtnPopup = `<button onclick="deleteReport(${rep.id})" class="mt-2 w-full bg-red-600 hover:bg-red-700 text-white text-xs py-1.5 rounded-lg font-semibold transition">🗑️ Hapus Laporan (Guru)</button>`;
+                }
+
+                const popupContent = `
+                    <div class="p-1 max-w-xs">
+                        <img src="${rep.photo}" onclick="openLightbox('${rep.photo}', '${rep.location}')" class="w-full h-32 object-cover rounded-xl cursor-pointer hover:opacity-90 transition mb-2 shadow-sm" alt="Foto Laporan" onerror="this.src='https://placehold.co/400x300/e2e8f0/64748b?text=Foto+Tidak+Tersedia'">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase">${rep.location}</span>
+                            <span class="bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold">${rep.studentClass || ''}</span>
+                        </div>
+                        <h4 class="font-bold text-slate-800 text-sm mt-1">${rep.name}</h4>
+                        <p class="text-xs text-slate-500 mb-2">${rep.date}</p>
+                        <p class="text-xs text-slate-700 line-clamp-3 leading-relaxed">${rep.description}</p>
+                        <button onclick="zoomToReport(${rep.lat}, ${rep.lng})" class="mt-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs py-1.5 rounded-lg font-semibold transition">🔍 Fokus di Peta</button>
+                        ${deleteBtnPopup}
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+                markersGroup.addLayer(marker);
+
+                const itemEl = document.createElement('div');
+                itemEl.className = 'pt-4 first:pt-0 hover:bg-emerald-50/50 p-2 rounded-xl transition cursor-pointer';
+                itemEl.onclick = (e) => {
+                    if (e.target.tagName === 'BUTTON') return;
+                    map.flyTo([rep.lat, rep.lng], 16, { duration: 1.5 });
+                    marker.openPopup();
+                };
+
+                let deleteBtnSidebar = '';
+                if (isAdminLoggedIn) {
+                    deleteBtnSidebar = `<button onclick="deleteReport(${rep.id})" class="mt-2 bg-red-100 hover:bg-red-200 text-red-700 text-[11px] px-2 py-1 rounded-md font-semibold transition flex items-center gap-1"><span>🗑️</span> Hapus</button>`;
+                }
+
+                itemEl.innerHTML = `
+                    <div class="flex gap-3">
+                        <img src="${rep.photo}" class="w-16 h-16 object-cover rounded-xl flex-shrink-0 border border-emerald-100" onerror="this.src='https://placehold.co/200x200/e2e8f0/64748b?text=No+Img'">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start">
+                                <h3 class="font-bold text-xs text-emerald-900 truncate">${rep.location}</h3>
+                                <span class="text-[10px] text-slate-400 whitespace-nowrap">${rep.date}</span>
+                            </div>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                <p class="text-xs font-semibold text-slate-700">${rep.name}</p>
+                                <span class="bg-emerald-100 text-emerald-800 text-[9px] px-1.5 py-0.5 rounded font-bold">${rep.studentClass || ''}</span>
+                            </div>
+                            <p class="text-xs text-slate-500 line-clamp-2 mt-1 leading-normal">${rep.description}</p>
+                            ${deleteBtnSidebar}
+                        </div>
+                    </div>
+                `;
+                listContainer.appendChild(itemEl);
+            });
+        }
+
+        function openModal() {
+            document.getElementById('reportModal').classList.remove('hidden');
+            if (!document.getElementById('coordDisplay').value) {
+                selectedLat = BAREGBEG_LAT;
+                selectedLng = BAREGBEG_LNG;
+                document.getElementById('coordDisplay').value = `${selectedLat.toFixed(5)}, ${selectedLng.toFixed(5)}`;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('reportModal').classList.add('hidden');
+            document.getElementById('envForm').reset();
+            document.getElementById('imagePreviewContainer').classList.add('hidden');
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+                tempMarker = null;
+            }
+        }
+
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        selectedLat = position.coords.latitude;
+                        selectedLng = position.coords.longitude;
+                        document.getElementById('coordDisplay').value = `${selectedLat.toFixed(5)}, ${selectedLng.toFixed(5)}`;
+                        
+                        map.setView([selectedLat, selectedLng], 17);
+                        if (tempMarker) map.removeLayer(tempMarker);
+                        tempMarker = L.marker([selectedLat, selectedLng], {
+                            icon: L.divIcon({
+                                className: 'custom-temp-marker',
+                                html: '<div style="background-color: #f59e0b; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"></div>',
+                                iconSize: [24, 24],
+                                iconAnchor: [12, 12]
+                            })
+                        }).addTo(map);
+                    },
+                    (error) => {
+                        showCustomMessage('Gagal mendeteksi lokasi GPS otomatis. Silakan masukkan secara manual atau klik titik peta.');
+                    }
+                );
+            } else {
+                showCustomMessage('Browser Anda tidak mendukung geolokasi.');
+            }
+        }
+
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('imgPreview').src = e.target.result;
+                    document.getElementById('imagePreviewContainer').classList.remove('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function handleFormSubmit(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('studentName').value;
+            const studentClass = document.getElementById('studentClass').value;
+            const location = document.getElementById('locationTitle').value;
+            const description = document.getElementById('envDescription').value;
+            const previewImgSrc = document.getElementById('imgPreview').src;
+
+            const newReport = {
+                id: Date.now(),
+                name: name,
+                studentClass: studentClass,
+                location: location,
+                lat: selectedLat,
+                lng: selectedLng,
+                photo: previewImgSrc,
+                description: description,
+                date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+            };
+
+            reports.unshift(newReport);
+            localStorage.setItem('baregbeg_env_reports', JSON.stringify(reports));
+
+            renderReports();
+            closeModal();
+            showCustomMessage('Terima kasih! Laporan peduli lingkungan berhasil ditambahkan ke peta Baregbeg. 🌿');
+
+            map.flyTo([selectedLat, selectedLng], 16, { duration: 1.5 });
+        }
+
+        function openLightbox(imgSrc, captionText) {
+            document.getElementById('lightboxImg').src = imgSrc;
+            document.getElementById('lightboxCaption').innerText = captionText;
+            document.getElementById('lightboxModal').classList.remove('hidden');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightboxModal').classList.add('hidden');
+        }
+
+        function zoomToReport(lat, lng) {
+            map.flyTo([lat, lng], 17, { duration: 1.5 });
+        }
+
+        function showCustomMessage(msg) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'fixed top-24 left-1/2 transform -translate-x-1/2 bg-emerald-800 text-white px-6 py-3 rounded-2xl shadow-xl z-[2000] text-sm font-medium transition animate-bounce';
+            alertDiv.innerText = msg;
+            document.body.appendChild(alertDiv);
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 4000);
+        }
+
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html>
